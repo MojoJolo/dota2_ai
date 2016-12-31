@@ -1,10 +1,12 @@
 -- TODO LIST
--- kill
--- TP
+-- euls, ulti
+-- fix utils
 -- Courier management
 -- talents (still bugged)
 -- KILL MOVES
 -- Separate proper position to retreat due to hit
+
+local utils = require(GetScriptDirectory().."/utils");
 
 local FUZZY_POS_START = 300;
 local FUZZY_POS_END = 500;
@@ -175,6 +177,7 @@ function GetProperPosition(avg_enemy_creep_pos, nearby_enemy_tower_pos, nearby_a
         if(avg_enemy_creep_pos ~= nil)
             then
             return desire_score, avg_enemy_creep_pos
+        end
 
         return desire_score, nearby_enemy_tower_pos
     end
@@ -209,17 +212,18 @@ function GetEnemyHeroesNearby()
 
                 if(HIT_NOW)
                     then
-                    desire_score = 85
+                    desire_score = 79
+
+                    if(enemy_health_percentage < 0.25)
+                    then
+                        desire_score = 95
+                    end
+
                     HIT_UNIT = hit_enemy_hero
+
                 else
                     HIT_UNIT = nil
-                    HIT_NOW = math.random(1, 4) == 1
-                end
-
-                if(enemy_health_percentage < 0.25)
-                    then
-                    desire_score = 95
-                    HIT_UNIT = enemy_hero
+                    HIT_NOW = math.random(1, 5) == 1
                 end
             end
         end
@@ -257,6 +261,7 @@ function LevelUp()
     -- end
 end
 
+-- to utils
 function CheckHP()
     local npc_bot = GetBot();
 
@@ -330,6 +335,7 @@ function RegenInBase()
     return desire_score
 end
 
+-- to utils
 function IsInBase()
     local npc_bot = GetBot();
     local fountain_distance = npc_bot:DistanceFromFountain()
@@ -340,6 +346,47 @@ function IsInBase()
     end
 
     return true
+end
+
+function BuyTP()
+    local desire_score = 0;
+
+    local npc_bot = GetBot();
+
+    if(not IsInBase())
+        then
+        return desire_score
+    end
+
+    local tp = utils:IsItemAvailable("item_tpscroll")
+
+    if(tp == nil and utils:HasEmptySlot() and npc_bot:GetGold() >= GetItemCost("item_tpscroll") and DotaTime() > 0)
+        then
+        desire_score = 10
+    end
+    
+    return desire_score
+end
+
+function UseTP()
+    local desire_score = 0;
+
+    local npc_bot = GetBot();
+
+    if(not IsInBase())
+        then
+        return desire_score, nil, nil
+    end
+
+    local tp = utils:IsItemAvailable("item_tpscroll")
+    local tower = utils:GetFrontTower(LANE_MID)
+
+    if(tp ~= nil and tp:IsFullyCastable() and tower ~= nil)
+        then
+        desire_score = 11
+    end
+
+    return desire_score, tp, tower
 end
 
 function UseSkill(nearby_enemy_creeps, nearby_enemy_heroes)
@@ -388,6 +435,7 @@ function UseSkill(nearby_enemy_creeps, nearby_enemy_heroes)
     return 0, nil, nil, false
 end
 
+-- to utils
 function FindNearestPoint(x1, y1, x2, y2)
     local d = math.sqrt((x2 - x1) ^ 2 + (y2 - y1) ^ 2)
     local t = 0.1 / d
@@ -433,6 +481,7 @@ function ConsiderRaze(skill, nearby_enemy_creeps, nearby_enemy_heroes)
     return 0, nil
 end
 
+-- to utils
 function isDead()
     local npc_bot = GetBot();
     local health = npc_bot:GetHealth()
@@ -454,6 +503,16 @@ function Think()
 
     damage_taken, damage_taken_percentage = CheckHP();
 
+    print("TEAM:")
+    print(team)
+
+    if(npc_bot:IsChanneling())
+        then
+        print("Currently channeling...")
+        print("-----")
+        return
+    end
+
     desire_scores['hit_tower'], nearby_enemy_tower_pos, enemy_tower_to_hit = GetEnemyTowersNearby();
     desire_scores['hit_enemy_hero'], nearby_enemy_heroes = GetEnemyHeroesNearby()
     desire_scores['kill_enemy_creep'], avg_enemy_creep_pos, nearby_enemy_creeps = GetCreepsNearby(true);
@@ -462,12 +521,11 @@ function Think()
     desire_scores['use_skill'], location_aoe, skill, is_aoe = UseSkill(nearby_enemy_creeps, nearby_enemy_heroes);
     desire_scores['retreat'] = Retreat();
     desire_scores['regen_in_base'] = RegenInBase();
+    desire_scores['buy_tp'] = BuyTP();
+    desire_scores['use_tp'], tp, tower = UseTP();
 
     local highest_task = 'idle'
     local highest_score = 0
-
-    print("TEAM:")
-    print(team)
 
     for task, desire_score in pairs(desire_scores)
         do
@@ -556,6 +614,15 @@ function Think()
         else
             print("Not moving")
         end
+
+    elseif(highest_task == 'buy_tp')
+        then
+        npc_bot:Action_PurchaseItem("item_tpscroll");
+
+    elseif(highest_task == 'use_tp')
+        then
+        npc_bot:Action_UseAbilityOnEntity(tp, tower);
+
     else
         highest_task = "no_action"
         print("No action")
@@ -570,6 +637,6 @@ function Think()
         then
         PREV_TASK = highest_task;
     end
-    
+
     print("-----")
 end
