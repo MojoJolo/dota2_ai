@@ -110,25 +110,22 @@ function GetCreepsNearby(is_enemy)
         -- CHECK CREEP TO KILL
         prospect_creep = GetCreepToKill(creep, is_enemy);
 
-        if(prospect_creep ~= nil and HIT_UNIT == nil)
+        if(prospect_creep ~= nil) -- and HIT_UNIT == nil)
             then
             HIT_UNIT = prospect_creep;
+
+            desire_score = 80
+
+            if(is_enemy)
+                then
+                desire_score = desire_score + 1;
+            end
         end
 
         -- CHECK AVERAGE ENEMY CREEP POSITION
         local creep_pos = creep:GetLocation();
         creep_x_pos_sum = creep_x_pos_sum + creep_pos[1];
         creep_y_pos_sum = creep_y_pos_sum + creep_pos[2];
-    end
-
-    if(HIT_UNIT ~= nil)
-        then
-        desire_score = 80
-
-        if(is_enemy)
-            then
-            desire_score = desire_score + 1;
-        end
     end
 
     local avg_creep_pos = nil
